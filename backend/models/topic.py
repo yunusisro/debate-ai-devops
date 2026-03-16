@@ -6,6 +6,8 @@ class TopicCreate(BaseModel):
     title: str
     description: Optional[str] = None
     category: Optional[str] = "General"
+    difficulty: Optional[str] = "Beginner"
+    participants: Optional[int] = 0
 
 class TopicResponse(BaseModel):
     id: str
@@ -13,6 +15,7 @@ class TopicResponse(BaseModel):
     description: Optional[str] = None
     category: str
     created_at: datetime
+    participants: int = 0
     usage_count: int = 0
 
 class TopicsList(BaseModel):

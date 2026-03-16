@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Navbar } from "@/components/ui/navbar"
+import { apiClient } from "@/lib/api"
 
 const suggestedTopics = [
   "Should genetic engineering be used to enhance human abilities?",
@@ -21,17 +22,41 @@ export default function CustomDebatePage() {
   const [description, setDescription] = useState("")
   const [stance, setStance] = useState("")
   const [difficulty, setDifficulty] = useState("")
+  // add near other state
+  const [category, setCategory] = useState("General")
 
-  const handleStartDebate = () => {
+  const categories = [
+    "General",
+    "Technology",
+    "Politics",
+    "Environment",
+    "Business",
+    "Sports",
+    "Economics",
+    "Science",
+    "Ethics",
+    "Philosophy",
+  ]
+
+  const handleStartDebate = async () => {
     if (topic.trim()) {
-      navigate('/debate', { 
-        state: { 
-          topic: topic.trim(), 
+      // Saving to the database 
+      await apiClient.post("/api/topics", {
+        title: topic.trim(),
+        description: description.trim(),
+        category,
+        difficulty: difficulty.trim(),
+        participants: 0,
+      })
+
+      navigate('/debate', {
+        state: {
+          topic: topic.trim(),
           description: description.trim(),
-          stance, 
+          stance,
           difficulty,
-          isCustom: true 
-        } 
+          isCustom: true
+        }
       })
     }
   }
@@ -43,11 +68,11 @@ export default function CustomDebatePage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         {/* Back Button */}
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className="mb-6 text-muted-foreground hover:text-foreground"
           onClick={() => navigate('/topics')}
         >
@@ -96,8 +121,8 @@ export default function CustomDebatePage() {
             </div>
           </CardContent>
 
-            {/* Topic Description  */}
-            <CardHeader className="mt-[-30px]">
+          {/* Topic Description  */}
+          <CardHeader className="mt-[-30px]">
             <CardTitle className="text-foreground text-sm">
               Topic Description
             </CardTitle>
@@ -137,6 +162,26 @@ export default function CustomDebatePage() {
               </Select>
             </div>
 
+            {/* Category Selection  */}
+
+            <div className="space-y-2">
+              <Label htmlFor="category" className="text-foreground font-medium">
+                Topic Category
+              </Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger className="bg-background border-border text-foreground">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Difficulty Selection */}
             <div className="space-y-2">
               <Label htmlFor="difficulty" className="text-foreground font-medium">
@@ -156,7 +201,7 @@ export default function CustomDebatePage() {
             </div>
 
             {/* Start Button */}
-            <Button 
+            <Button
               className="w-full bg-accent hover:bg-accent-hover text-accent-foreground font-semibold py-6 text-lg"
               onClick={handleStartDebate}
               disabled={!topic.trim()}

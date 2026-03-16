@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { apiClient } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,96 +9,51 @@ import { useNavigate } from "react-router-dom"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useToast } from "@/hooks/use-toast"
 
-// Mock topics data
-const topicsData = [
-  {
-    id: 1,
-    title: "Should AI replace human teachers in education?",
-    category: "Technology",
-    participants: 1247,
-    trending: true,
-    difficulty: "Intermediate",
-    description: "Explore the future of education and AI's role in teaching."
-  },
-  {
-    id: 2,
-    title: "Is climate change the most urgent global crisis?",
-    category: "Environment",
-    participants: 892,
-    trending: true,
-    difficulty: "Advanced",
-    description: "Debate the priority of environmental issues in global policy."
-  },
-  {
-    id: 3,
-    title: "Should social media platforms be regulated by government?",
-    category: "Politics",
-    participants: 2156,
-    trending: false,
-    difficulty: "Intermediate",
-    description: "Discuss the balance between free speech and content moderation."
-  },
-  {
-    id: 4,
-    title: "Is remote work better than office work?",
-    category: "Business",
-    participants: 678,
-    trending: false,
-    difficulty: "Beginner",
-    description: "Compare the benefits and drawbacks of different work environments."
-  },
-  {
-    id: 5,
-    title: "Should athletes be allowed to use performance-enhancing drugs?",
-    category: "Sports",
-    participants: 543,
-    trending: false,
-    difficulty: "Intermediate",
-    description: "Examine ethics and fairness in competitive sports."
-  },
-  {
-    id: 6,
-    title: "Is universal basic income a viable economic solution?",
-    category: "Economics",
-    participants: 987,
-    trending: true,
-    difficulty: "Advanced",
-    description: "Analyze the feasibility and impact of UBI policies."
-  },
-  {
-    id: 7,
-    title: "Should space exploration be prioritized over Earth problems?",
-    category: "Science",
-    participants: 754,
-    trending: false,
-    difficulty: "Intermediate",
-    description: "Weigh the importance of space missions versus terrestrial issues."
-  },
-  {
-    id: 8,
-    title: "Is fast fashion ethically acceptable?",
-    category: "Ethics",
-    participants: 432,
-    trending: false,
-    difficulty: "Beginner",
-    description: "Discuss the moral implications of affordable clothing production."
-  }
-]
-
 const categories = ["All", "Technology", "Politics", "Environment", "Business", "Sports", "Economics", "Science", "Ethics", "Philosophy"]
+
+
+type Topic = {
+  id: string,
+  title: string,
+  description?: string,
+  category: string,
+  difficulty: string,
+  participants: number,
+  usage_count:  number
+}
 
 export default function TopicsPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const [topics, setTopics] = useState<Topic[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
 
-  const filteredTopics = topicsData.filter(topic => {
-    const matchesSearch = topic.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         topic.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === "All" || topic.category === selectedCategory
-    return matchesSearch && matchesCategory
-  })
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await apiClient.get<{ topics: Topic[]; total: number }>("/api/topics")
+        setTopics(res.topics || [])
+      } catch (e: any) {
+        toast({
+          title: "Failed to load topics",
+          description: e?.message || "Please login and try again.",
+          variant: "destructive",
+        })
+      }
+    })()
+  }, [])
+
+  const filteredTopics = useMemo(() => {
+    return topics.filter((t) => {
+      const matchesSearch =
+        t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (t.description || "").toLowerCase().includes(searchTerm.toLowerCase())
+
+      const matchesCategory = selectedCategory === "All" || t.category === selectedCategory
+      return matchesSearch && matchesCategory
+    })
+  }, [topics, searchTerm, selectedCategory])
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -190,7 +146,7 @@ export default function TopicsPage() {
             {filteredTopics.map((topic) => (
               <Card key={topic.id} className="card-gradient border-border/50 shadow-card hover:shadow-lg transition-all duration-300 group">
                 <CardHeader className="space-y-3">
-                  <div className="flex items-start justify-between">
+                  {/* <div className="flex items-start justify-between">
                     <Badge variant="outline" className="text-xs">
                       {topic.category}
                     </Badge>
@@ -200,7 +156,7 @@ export default function TopicsPage() {
                         Trending
                       </Badge>
                     )}
-                  </div>
+                  </div> */}
                   <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">
                     {topic.title}
                   </CardTitle>
@@ -222,7 +178,8 @@ export default function TopicsPage() {
                     className="w-full bg-accent hover:bg-accent-hover text-accent-foreground font-semibold"
                     onClick={() => navigate('/debate', { 
                       state: { 
-                        topic: topic.title, 
+                        topic: topic.title,
+                        description: topic.description,
                         stance: 'for', 
                         difficulty: topic.difficulty.toLowerCase(),
                         isCustom: false 

@@ -20,6 +20,8 @@ async def create_topic(
         "title": topic.title,
         "description": topic.description,
         "category": topic.category,
+        "difficulty": (topic.difficulty or "Beginner").lower(),
+        "participants": topic.participants if topic.participants is not None else 0,
         "created_at": datetime.utcnow(),
         "usage_count": 0,
         "created_by": current_user["_id"]
@@ -33,6 +35,8 @@ async def create_topic(
         title=topic_doc["title"],
         description=topic_doc["description"],
         category=topic_doc["category"],
+        difficulty=topic_doc["difficulty"],
+        participants=topic_doc["participants"],
         created_at=topic_doc["created_at"],
         usage_count=topic_doc["usage_count"]
     )
@@ -48,12 +52,11 @@ async def get_topics(
     topics_collection = db["topics"]
 
     query = {}
-    if category:
+    if category and category != "All":
         query["category"] = category
 
-    cursor = topics_collection.find(query).sort("usage_count", -1).skip(skip).limit(limit)
+    cursor = topics_collection.find(query).sort("participants", -1).skip(skip).limit(limit)
     topics = await cursor.to_list(length=limit)
-
     total = await topics_collection.count_documents(query)
 
     topics_list = [
@@ -62,6 +65,8 @@ async def get_topics(
             title=topic["title"],
             description=topic.get("description"),
             category=topic["category"],
+            difficulty=topic["difficulty"],
+            participants=topic["participants"],
             created_at=topic["created_at"],
             usage_count=topic.get("usage_count", 0)
         )
@@ -70,6 +75,7 @@ async def get_topics(
 
     return TopicsList(topics=topics_list, total=total)
 
+# Get a single topic by ID
 @router.get("/{topic_id}", response_model=TopicResponse)
 async def get_topic(
     topic_id: str,
@@ -90,6 +96,8 @@ async def get_topic(
         title=topic["title"],
         description=topic.get("description"),
         category=topic["category"],
+        difficulty=topic["difficulty"],
+        participants=topic["participants"],
         created_at=topic["created_at"],
         usage_count=topic.get("usage_count", 0)
     )

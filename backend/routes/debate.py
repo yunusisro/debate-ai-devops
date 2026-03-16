@@ -30,7 +30,7 @@ async def create_debate_session(
     if not session_data.custom_topic:
         await topics_collection.update_one(
             {"title": session_data.topic},
-            {"$inc": {"usage_count": 1}}
+            {"$inc": {"usage_count": 1, "participants": 1}}
         )
 
     opening_statement = await gemini_service.generate_opening_statement(
