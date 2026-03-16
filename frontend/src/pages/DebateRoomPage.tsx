@@ -20,7 +20,7 @@ export default function DebateRoomPage() {
   const navigate = useNavigate()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
-  const { topic, stance, difficulty, isCustom, description, category } = location.state || {}
+  const { topicId, topic, stance, difficulty, isCustom, description, category } = location.state || {}
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [isTyping, setIsTyping] = useState(false)
@@ -50,6 +50,7 @@ export default function DebateRoomPage() {
 
         const session = await apiClient.post<any>("/api/debate/session", {
           topic,
+          topic_id: topicId,
           custom_topic: !!isCustom,
           ai_stance,
           candidate_stance,

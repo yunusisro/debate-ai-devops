@@ -57,11 +57,13 @@ export default function TopicsPage() {
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case "Beginner":
+      case "beginner":
         return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      case "Intermediate":
+      case "intermediate":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      case "Advanced":
+      case "advanced":
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+      case "expert":
         return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
@@ -146,17 +148,6 @@ export default function TopicsPage() {
             {filteredTopics.map((topic) => (
               <Card key={topic.id} className="card-gradient border-border/50 shadow-card hover:shadow-lg transition-all duration-300 group">
                 <CardHeader className="space-y-3">
-                  {/* <div className="flex items-start justify-between">
-                    <Badge variant="outline" className="text-xs">
-                      {topic.category}
-                    </Badge>
-                    {topic.trending && (
-                      <Badge className="bg-accent text-accent-foreground flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3" />
-                        Trending
-                      </Badge>
-                    )}
-                  </div> */}
                   <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">
                     {topic.title}
                   </CardTitle>
@@ -177,11 +168,13 @@ export default function TopicsPage() {
                   <Button 
                     className="w-full bg-accent hover:bg-accent-hover text-accent-foreground font-semibold"
                     onClick={() => navigate('/debate', { 
-                      state: { 
+                      state: {
+                        topicId: topic.id,
                         topic: topic.title,
                         description: topic.description,
+                        category: topic.category,
                         stance: 'for', 
-                        difficulty: topic.difficulty.toLowerCase(),
+                        difficulty: (topic.difficulty ?? "intermediate").toLowerCase(),
                         isCustom: false 
                       } 
                     })}
