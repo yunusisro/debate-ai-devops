@@ -19,6 +19,7 @@ const suggestedTopics = [
 export default function CustomDebatePage() {
   const navigate = useNavigate()
   const [topic, setTopic] = useState("")
+  const [description, setDescription] = useState("")
   const [stance, setStance] = useState("")
   const [difficulty, setDifficulty] = useState("")
 
@@ -88,8 +89,33 @@ export default function CustomDebatePage() {
               <Textarea
                 id="topic"
                 placeholder="e.g., Should artificial intelligence be granted legal rights?"
-                className="min-h-[120px] bg-background border-border text-foreground placeholder:text-muted-foreground resize-none"
+                className="min-h-[50px] bg-background border-border text-foreground placeholder:text-muted-foreground resize-none"
                 value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+              />
+            </div>
+          </CardContent>
+
+            {/* Topic Description  */}
+            <CardHeader className="mt-[-30px]">
+            <CardTitle className="text-foreground text-sm">
+              Topic Description
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Enter a description of the topic you want to argue about. Be specific for better debate quality.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Description Input */}
+            <div className="space-y-2">
+              <Label htmlFor="description" className="text-foreground font-medium">
+                Your Debate Topic Description
+              </Label>
+              <Textarea
+                id="topic"
+                placeholder="Your Description goes here..."
+                className="min-h-[100px] bg-background border-border text-foreground placeholder:text-muted-foreground resize-none"
+                value={description}
                 onChange={(e) => setTopic(e.target.value)}
               />
             </div>
