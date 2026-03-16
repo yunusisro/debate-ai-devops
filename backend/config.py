@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     MONGODB_URL: str = "mongodb://localhost:27017"
     DATABASE_NAME: str = "debate_assistant"
 
-    GEMINI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
 
     JWT_SECRET_KEY: str = "your-secret-key-change-this"
     JWT_ALGORITHM: str = "HS256"

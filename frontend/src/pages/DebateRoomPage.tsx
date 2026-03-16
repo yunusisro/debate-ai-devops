@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Navbar } from "@/components/ui/navbar"
+import { apiClient } from "@/lib/api"
 
 interface Message {
   id: number
@@ -17,42 +18,54 @@ interface Message {
 
 export default function DebateRoomPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  
-  const { topic, stance, difficulty, isCustom } = location.state || {
-    topic: "Should AI replace human teachers in education?",
-    stance: "for",
-    difficulty: "intermediate",
-    isCustom: false
-  }
-
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      role: 'ai',
-      content: `Welcome to the debate! Today's topic is: "${topic}"\n\nYou are arguing ${stance === 'for' ? 'IN FAVOR OF' : stance === 'against' ? 'AGAINST' : 'your chosen position on'} this topic. I'll be taking the opposing stance.\n\nLet's begin! Please present your opening argument.`,
-      timestamp: new Date()
-    }
-  ])
-  const [inputMessage, setInputMessage] = useState("")
+  const location = useLocation()
+  const { topic, stance, difficulty, isCustom, description, category } = location.state || {}
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
   const [isTyping, setIsTyping] = useState(false)
+  const [inputMessage, setInputMessage] = useState("")
   const [debateRound, setDebateRound] = useState(1)
   const [timeElapsed, setTimeElapsed] = useState(0)
   const [isRecording, setIsRecording] = useState(false)
   const maxRounds = 5
 
-  // Auto-scroll to bottom
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Timer
+  // ✅ timer
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeElapsed(prev => prev + 1)
-    }, 1000)
+    const timer = setInterval(() => setTimeElapsed((p) => p + 1), 1000)
     return () => clearInterval(timer)
+  }, [])
+  
+  // Auto-scroll to bottom
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const candidate_stance = stance === "neutral" ? "for" : stance
+        const ai_stance = candidate_stance === "for" ? "against" : "for"
+
+        const session = await apiClient.post<any>("/api/debate/session", {
+          topic,
+          custom_topic: !!isCustom,
+          ai_stance,
+          candidate_stance,
+          description,
+          category,
+          difficulty,
+        })
+
+        setSessionId(session.id)
+        const opening = session.messages?.[0]?.content || "Let’s begin."
+        setMessages([{ id: 1, role: "ai", content: opening, timestamp: new Date() }])
+      } catch (e) {
+        // optional: navigate to login or show toast
+        console.error(e)
+      }
+    })()
   }, [])
 
   const formatTime = (seconds: number) => {
@@ -83,32 +96,30 @@ export default function DebateRoomPage() {
     return responses[Math.floor(Math.random() * responses.length)]
   }
 
-  const handleSendMessage = () => {
-    if (!inputMessage.trim()) return
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || !sessionId) return
+    const content = inputMessage.trim()
 
-    const userMessage: Message = {
-      id: messages.length + 1,
-      role: 'user',
-      content: inputMessage.trim(),
-      timestamp: new Date()
-    }
-
-    setMessages(prev => [...prev, userMessage])
+    setMessages((prev) => [
+      ...prev,
+      { id: prev.length + 1, role: "user", content, timestamp: new Date() },
+    ])
     setInputMessage("")
     setIsTyping(true)
 
-    // Simulate AI thinking and responding
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: messages.length + 2,
-        role: 'ai',
-        content: getAIResponse(inputMessage),
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, aiResponse])
-      setIsTyping(false)
-      setDebateRound(prev => Math.min(prev + 1, maxRounds))
-    }, 2000 + Math.random() * 2000)
+    const res = await apiClient.post<{ ai_message: string }>("/api/debate/respond", {
+      session_id: sessionId,
+      content,
+    })
+
+    setMessages((prev) => [
+      ...prev,
+      { id: prev.length + 1, role: "ai", content: res.ai_message, timestamp: new Date() },
+    ])
+    setIsTyping(false)
+
+    // ✅ keep your round progress UI working
+    setDebateRound((r) => Math.min(r + 1, maxRounds))
   }
 
   const handleEndDebate = () => {

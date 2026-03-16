@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from models.evaluation import EvaluationCreate, EvaluationResponse, EvaluationCriteria
 from routes.auth import get_current_user
 from database.connection import get_database
-from services.gemini_service import gemini_service
+from services.groq_service import groq_service
 from datetime import datetime
 from bson import ObjectId
 from typing import List

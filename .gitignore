@@ -1,0 +1,85 @@
+# =====================================
+# GLOBAL ENV FILES (VERY IMPORTANT)
+# =====================================
+.env
+.env.*
+*.env
+!.env.example
+
+# =====================================
+# PYTHON (BACKEND)
+# =====================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+venv/
+env/
+.venv/
+
+# Python build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Local DB
+*.sqlite3
+*.db
+
+# =====================================
+# NODE / REACT (FRONTEND)
+# =====================================
+node_modules/
+dist/
+build/
+.next/
+out/
+
+# Vite
+.vite/
+vite.svg
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =====================================
+# IDE / EDITOR
+# =====================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =====================================
+# OS FILES
+# =====================================
+.DS_Store
+Thumbs.db
+
+# =====================================
+# LOG FILES
+# =====================================
+*.log
+logs/
+
+# =====================================
+# DOCKER
+# =====================================
+docker-compose.override.yml
+
+# =====================================
+# TEMP FILES
+# =====================================
+tmp/
+temp/
+*.tmp

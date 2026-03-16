@@ -11,7 +11,7 @@ from models.debate import (
 )
 from routes.auth import get_current_user
 from database.connection import get_database
-from services.gemini_service import gemini_service
+from services.groq_service import groq_service
 from datetime import datetime
 from bson import ObjectId
 from typing import List
@@ -33,9 +33,12 @@ async def create_debate_session(
             {"$inc": {"usage_count": 1, "participants": 1}}
         )
 
-    opening_statement = await gemini_service.generate_opening_statement(
+    opening_statement = await groq_service.generate_opening_statement(
         session_data.topic,
-        session_data.ai_stance
+        session_data.ai_stance,
+        session_data.description,
+        session_data.category,
+        session_data.difficulty
     )
 
     ai_message = DebateMessage(
@@ -49,6 +52,9 @@ async def create_debate_session(
         "topic": session_data.topic,
         "custom_topic": session_data.custom_topic,
         "ai_stance": session_data.ai_stance,
+        "description": session_data.description,
+        "category": session_data.category,
+        "difficulty": session_data.difficulty,
         "candidate_stance": session_data.candidate_stance,
         "status": DebateStatus.ACTIVE,
         "messages": [ai_message.dict()],
@@ -110,11 +116,14 @@ async def submit_candidate_response(
         {"$push": {"messages": candidate_message.dict()}}
     )
 
-    ai_response = await gemini_service.generate_ai_argument(
+    ai_response = await groq_service.generate_ai_argument(
         topic=session["topic"],
         ai_stance=session["ai_stance"],
         conversation_history=session["messages"],
-        candidate_message=response_data.content
+        candidate_message=response_data.content,
+        description=session.get("description"),
+        category=session.get("category"),
+        difficulty=session.get("difficulty")
     )
 
     ai_message = DebateMessage(

@@ -23,6 +23,9 @@ class DebateSessionCreate(BaseModel):
     custom_topic: Optional[bool] = False
     ai_stance: str
     candidate_stance: str
+    description: Optional[str] = None
+    category: Optional[str] = "General"
+    difficulty: Optional[str] = "intermediate"
 
 class DebateSessionResponse(BaseModel):
     id: str

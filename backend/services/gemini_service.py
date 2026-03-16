@@ -1,101 +1,119 @@
-import google.generativeai as genai
+from google import genai
 from config import settings
 from typing import List, Dict
+import asyncio
 
 class GeminiService:
     def __init__(self):
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY, http_options={"api_version": "v1beta"})
 
     async def generate_ai_argument(
         self,
         topic: str,
         ai_stance: str,
         conversation_history: List[Dict[str, str]],
-        candidate_message: str
+        candidate_message: str,
+        description: str | None,
+        category: str | None,
+        difficulty: str | None
     ) -> str:
-        context = f"""You are participating in a debate on the topic: "{topic}"
-Your stance is: {ai_stance}
 
-Previous conversation:
+        context = f"""
+You are participating in a debate on the topic: "{topic}"
+Description: "{description}"
+Category: "{category}"
+Difficulty: "{difficulty}"
+Your stance: {ai_stance}
+
+Opponent's latest argument:
+{candidate_message}
+
+Respond with a strong logical counter-argument (2-3 paragraphs).
 """
-        for msg in conversation_history[-6:]:
-            speaker = "You" if msg["speaker"] == "ai" else "Opponent"
-            context += f"{speaker}: {msg['content']}\n\n"
 
-        context += f"""
-Opponent's latest argument: {candidate_message}
+        response = await asyncio.to_thread(
+            self.client.models.generate_content,
+            model="models/gemini-1.5-flash",
+            contents=context,
+        )
 
-Provide a strong, logical counter-argument. Be persuasive, use evidence when possible, and address their points directly. Keep your response concise (2-3 paragraphs maximum).
-"""
-
-        response = self.model.generate_content(context)
         return response.text
 
-    async def generate_opening_statement(self, topic: str, ai_stance: str) -> str:
-        prompt = f"""You are starting a debate on the topic: "{topic}"
-Your stance is: {ai_stance}
+    async def generate_opening_statement(
+        self,
+        topic: str,
+        ai_stance: str,
+        description: str | None,
+        category: str | None,
+        difficulty: str | None
+    ) -> str:
 
-Provide a strong opening statement for your position. Be clear, persuasive, and set the stage for the debate. Keep it concise (2-3 paragraphs).
+        prompt = f"""
+You are starting a debate on the topic: "{topic}"
+Description: "{description}"
+Category: "{category}"
+Difficulty: "{difficulty}"
+Your stance: {ai_stance}
+
+Write a strong opening statement (2-3 paragraphs).
 """
 
-        response = self.model.generate_content(prompt)
+        response = await asyncio.to_thread(
+            self.client.models.generate_content,
+            model="models/gemini-1.5-flash",
+            contents=prompt,
+        )
+
         return response.text
 
     async def evaluate_debate(
         self,
         topic: str,
-        conversation_history: List[Dict[str, str]],
         candidate_messages: List[str]
     ) -> Dict:
-        candidate_arguments = "\n\n".join([f"Argument {i+1}: {msg}" for i, msg in enumerate(candidate_messages)])
 
-        prompt = f"""Evaluate the following debate performance on the topic: "{topic}"
+        arguments = "\n\n".join(candidate_messages)
 
-Candidate's Arguments:
-{candidate_arguments}
+        prompt = f"""
+Evaluate this debate on topic: "{topic}"
 
-Provide a comprehensive evaluation with:
-1. Scores (0-10) for:
-   - Argumentation (logic and reasoning)
-   - Clarity (clear communication)
-   - Evidence (use of facts and examples)
-   - Rebuttal (addressing counterarguments)
-   - Presentation (overall delivery)
+Candidate Arguments:
+{arguments}
 
-2. List 3-5 key strengths
-3. List 3-5 areas for improvement
-4. Overall feedback paragraph
-5. Detailed analysis
-
-Format your response as JSON with keys: argumentation, clarity, evidence, rebuttal, presentation, strengths (array), weaknesses (array), feedback, analysis
+Return JSON with:
+argumentation (0-10)
+clarity (0-10)
+evidence (0-10)
+rebuttal (0-10)
+presentation (0-10)
+strengths (array)
+weaknesses (array)
+feedback
+analysis
 """
 
-        response = self.model.generate_content(prompt)
+        response = await asyncio.to_thread(
+            self.client.models.generate_content,
+            model="models/gemini-1.5-flash",
+            contents=prompt,
+        )
+
         return self._parse_evaluation_response(response.text)
 
     def _parse_evaluation_response(self, response_text: str) -> Dict:
+        import json
         try:
-            import json
-            cleaned_text = response_text.strip()
-            if cleaned_text.startswith("```json"):
-                cleaned_text = cleaned_text[7:]
-            if cleaned_text.endswith("```"):
-                cleaned_text = cleaned_text[:-3]
-            cleaned_text = cleaned_text.strip()
-
-            evaluation = json.loads(cleaned_text)
-            return evaluation
-        except Exception as e:
+            return json.loads(response_text.strip())
+        except:
             return {
-                "argumentation": 7.0,
-                "clarity": 7.0,
-                "evidence": 7.0,
-                "rebuttal": 7.0,
-                "presentation": 7.0,
-                "strengths": ["Good effort", "Engaged in the debate", "Showed interest"],
-                "weaknesses": ["Could provide more evidence", "Could be more structured"],
-                "feedback": "Good debate performance. Continue practicing to improve your skills.",
+                "argumentation": 7,
+                "clarity": 7,
+                "evidence": 7,
+                "rebuttal": 7,
+                "presentation": 7,
+                "strengths": ["Good effort"],
+                "weaknesses": ["Needs improvement"],
+                "feedback": "Keep practicing.",
                 "analysis": response_text
             }
 
