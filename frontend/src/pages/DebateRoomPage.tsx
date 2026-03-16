@@ -123,9 +123,23 @@ export default function DebateRoomPage() {
     setDebateRound((r) => Math.min(r + 1, maxRounds))
   }
 
-  const handleEndDebate = () => {
+
+const handleEndDebate = async () => {
+  if (!sessionId) return;
+  
+  try {
+    // End the debate session
+    await apiClient.post(`/api/debate/session/${sessionId}/end`);
+    
+    // Create evaluation
+    await apiClient.post("/api/evaluation", {
+      session_id: sessionId,
+    });
+    
+    // Navigate to report page with session ID
     navigate('/debate-report', {
       state: {
+        sessionId,
         topic,
         stance,
         difficulty,
@@ -133,8 +147,23 @@ export default function DebateRoomPage() {
         timeElapsed,
         rounds: debateRound
       }
-    })
+    });
+  } catch (error) {
+    console.error("Error ending debate:", error);
+    // Still navigate to report even if evaluation fails
+    navigate('/debate-report', {
+      state: {
+        sessionId,
+        topic,
+        stance,
+        difficulty,
+        messages,
+        timeElapsed,
+        rounds: debateRound
+      }
+    });
   }
+};
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

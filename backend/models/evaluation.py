@@ -9,6 +9,19 @@ class EvaluationCriteria(BaseModel):
     rebuttal: float = Field(ge=0, le=10)
     presentation: float = Field(ge=0, le=10)
 
+class StrengthItem(BaseModel):
+    title: str
+    description: str
+
+class WeaknessItem(BaseModel):
+    title: str
+    description: str
+
+class ImprovementItem(BaseModel):
+    title: str
+    description: str
+    priority: str = Field(default="medium")  # high, medium, low
+
 class EvaluationCreate(BaseModel):
     session_id: str
 
@@ -18,8 +31,10 @@ class EvaluationResponse(BaseModel):
     user_id: str
     criteria_scores: EvaluationCriteria
     overall_score: float
-    strengths: List[str]
-    weaknesses: List[str]
+    strengths: List[StrengthItem]
+    weaknesses: List[WeaknessItem]
+    improvements: List[ImprovementItem]
+    missed_points: List[str]
     feedback: str
     ai_analysis: str
     created_at: datetime

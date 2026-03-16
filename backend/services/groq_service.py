@@ -71,46 +71,131 @@ Rules:
         return resp.choices[0].message.content or ""
     
 
-# inside GroqService class
-async def evaluate_debate(self, topic: str, candidate_messages: List[str]) -> Dict:
-    arguments = "\n\n".join(candidate_messages)
+    async def evaluate_debate(
+        self,
+        topic: str,
+        conversation_history: List[Dict],
+        candidate_messages: List[str],
+        ai_stance: Optional[str] = None,
+        candidate_stance: Optional[str] = None,
+        difficulty: Optional[str] = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None
+    ) -> Dict:
+        """
+        Comprehensive debate evaluation using Groq.
+        Analyzes all aspects of the candidate's performance.
+        """
+        # Build conversation context
+        conversation_text = ""
+        for msg in conversation_history:
+            speaker = "AI" if msg.get("speaker") == "ai" else "Candidate"
+            conversation_text += f"\n{speaker}: {msg.get('content', '')}\n"
 
-    prompt = f"""
-Evaluate this debate on topic: "{topic}"
+        prompt = f"""You are an expert debate judge. Evaluate the candidate's performance comprehensively.
 
-Candidate Arguments:
-{arguments}
+DEBATE CONTEXT:
+Topic: "{topic}"
+Description: "{description or 'No specific description'}"
+Category: "{category or 'General'}"
+Difficulty Level: "{difficulty or 'intermediate'}"
+AI Stance: "{ai_stance or 'unknown'}"
+Candidate Stance: "{candidate_stance or 'unknown'}"
 
-Return JSON with keys:
-argumentation, clarity, evidence, rebuttal, presentation (0-10 numbers),
-strengths (array), weaknesses (array), feedback, analysis
-""".strip()
+FULL CONVERSATION:
+{conversation_text}
 
-    resp = self.client.chat.completions.create(
-        model=self.model,
-        messages=[
-            {"role": "system", "content": "You are a strict debate judge. Output ONLY valid JSON."},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.2,
-    )
+EVALUATION TASK:
+You MUST evaluate the candidate's arguments, not the AI's. Return ONLY valid JSON with this exact structure:
+{{
+  "argumentation": <0-10 score for logical argument construction>,
+  "clarity": <0-10 score for how clearly ideas are expressed>,
+  "evidence": <0-10 score for use of data, examples, and citations>,
+  "rebuttal": <0-10 score for addressing opponent's points>,
+  "presentation": <0-10 score for overall delivery and engagement>,
+  "strengths": [
+    {{
+      "title": "<brief strength title>",
+      "description": "<2-3 sentence explanation of this strength>"
+    }}
+  ],
+  "weaknesses": [
+    {{
+      "title": "<brief weakness title>",
+      "description": "<2-3 sentence explanation of this weakness>"
+    }}
+  ],
+  "improvements": [
+    {{
+      "title": "<improvement area>",
+      "description": "<specific, actionable improvement suggestion>",
+      "priority": "high|medium|low"
+    }}
+  ],
+  "missed_points": [
+    "<important argument or perspective they didn't address>",
+    "<another missed opportunity>"
+  ],
+  "feedback": "<2-3 paragraph personalized feedback on their debate performance>",
+  "analysis": "<1-2 paragraph deep analysis of their debate style, strengths, and growth areas>"
+}}
 
-    text = resp.choices[0].message.content or "{}"
+Be critical but fair. Consider the difficulty level when scoring. Generate realistic scores and insights.""".strip()
 
-    try:
-        return json.loads(text)
-    except:
-        # fallback if model returns non-JSON
-        return {
-            "argumentation": 7,
-            "clarity": 7,
-            "evidence": 7,
-            "rebuttal": 7,
-            "presentation": 7,
-            "strengths": ["Good effort"],
-            "weaknesses": ["Needs improvement"],
-            "feedback": "Keep practicing.",
-            "analysis": text,
-        }
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a strict, expert debate evaluator. Output ONLY valid JSON, no markdown code blocks."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.3,
+        )
+
+        text = resp.choices[0].message.content or "{}"
+        
+        # Clean up markdown code blocks if present
+        text = text.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+
+        try:
+            result = json.loads(text)
+            # Ensure all required fields exist
+            return {
+                "argumentation": result.get("argumentation", 6.5),
+                "clarity": result.get("clarity", 6.5),
+                "evidence": result.get("evidence", 6.5),
+                "rebuttal": result.get("rebuttal", 6.5),
+                "presentation": result.get("presentation", 6.5),
+                "strengths": result.get("strengths", []),
+                "weaknesses": result.get("weaknesses", []),
+                "improvements": result.get("improvements", []),
+                "missed_points": result.get("missed_points", []),
+                "feedback": result.get("feedback", ""),
+                "analysis": result.get("analysis", ""),
+            }
+        except:
+            # fallback if model returns non-JSON
+            return {
+                "argumentation": 6.5,
+                "clarity": 6.5,
+                "evidence": 6.5,
+                "rebuttal": 6.5,
+                "presentation": 6.5,
+                "strengths": [{"title": "Engaged in debate", "description": "You participated actively in the debate."}],
+                "weaknesses": [{"title": "Needs more evidence", "description": "Consider adding more data and examples."}],
+                "improvements": [
+                    {"title": "Research thoroughly", "description": "Prepare with more facts and statistics.", "priority": "high"},
+                    {"title": "Practice rebuttals", "description": "Work on addressing opponent's points more directly.", "priority": "medium"}
+                ],
+                "missed_points": ["Could have addressed counterarguments more thoroughly"],
+                "feedback": f"Your debate on '{topic}' showed engagement. Keep practicing to improve your performance.",
+                "analysis": f"Model error. {text[:200]}"
+            }
 
 groq_service = GroqService()

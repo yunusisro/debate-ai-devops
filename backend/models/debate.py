@@ -20,6 +20,7 @@ class DebateMessage(BaseModel):
 
 class DebateSessionCreate(BaseModel):
     topic: str
+    topic_id: Optional[str] = None
     custom_topic: Optional[bool] = False
     ai_stance: str
     candidate_stance: str
