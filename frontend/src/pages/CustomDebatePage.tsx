@@ -4,7 +4,6 @@ import { ArrowLeft, Sparkles, MessageSquare, Lightbulb } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Navbar } from "@/components/ui/navbar"
@@ -28,6 +27,7 @@ export default function CustomDebatePage() {
       navigate('/debate', { 
         state: { 
           topic: topic.trim(), 
+          description: description.trim(),
           stance, 
           difficulty,
           isCustom: true 
@@ -112,11 +112,11 @@ export default function CustomDebatePage() {
                 Your Debate Topic Description
               </Label>
               <Textarea
-                id="topic"
+                id="description"
                 placeholder="Your Description goes here..."
                 className="min-h-[100px] bg-background border-border text-foreground placeholder:text-muted-foreground resize-none"
                 value={description}
-                onChange={(e) => setTopic(e.target.value)}
+                onChange={(e) => setDescription(e.target.value)}
               />
             </div>
 
