@@ -1,7 +1,14 @@
-import { useState, useEffect } from "react";
+import { apiClient } from "@/lib/api";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -13,7 +20,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Navbar } from "@/components/ui/navbar";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { userService } from "@/services/userService";
+import { userService, DebateHistoryItem } from "@/services/userService";
 import {
   User,
   Trophy,
@@ -29,84 +36,36 @@ import {
   Clock,
   TrendingUp,
   Award,
-  Target
+  Target,
 } from "lucide-react";
 
-
-const mockDebateHistory = [
-  {
-    id: "debate_1",
-    topic: "AI will replace most human jobs within 20 years",
-    date: "2024-12-10",
-    duration: "15:32",
-    result: "won",
-    score: 88,
-    position: "For",
-    opponent: "AI Assistant"
-  },
-  {
-    id: "debate_2",
-    topic: "Social media does more harm than good to society",
-    date: "2024-12-08",
-    duration: "12:45",
-    result: "won",
-    score: 85,
-    position: "Against",
-    opponent: "AI Assistant"
-  },
-  {
-    id: "debate_3",
-    topic: "Universal Basic Income should be implemented globally",
-    date: "2024-12-05",
-    duration: "18:20",
-    result: "lost",
-    score: 72,
-    position: "For",
-    opponent: "AI Assistant"
-  },
-  {
-    id: "debate_4",
-    topic: "Space exploration is worth the investment",
-    date: "2024-12-01",
-    duration: "14:10",
-    result: "won",
-    score: 91,
-    position: "For",
-    opponent: "AI Assistant"
-  },
-  {
-    id: "debate_5",
-    topic: "Remote work should become the standard",
-    date: "2024-11-28",
-    duration: "16:55",
-    result: "won",
-    score: 78,
-    position: "Against",
-    opponent: "AI Assistant"
-  }
-];
 
 const mockSettings = {
   notifications: {
     debateReminders: true,
     weeklyReports: true,
-    leaderboardUpdates: false
+    leaderboardUpdates: false,
   },
   voice: {
     speechToText: true,
     textToSpeech: true,
-    voiceSpeed: 1.0
+    voiceSpeed: 1.0,
   },
   privacy: {
     showOnLeaderboard: true,
-    publicProfile: false
-  }
+    publicProfile: false,
+  },
 };
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, isLoading, loadUser } = useAuth();   // add loadUser
-  const { toast } = useToast();                     // add this line
+  const { user, isLoading, loadUser } = useAuth(); // add loadUser
+  const { toast } = useToast(); // add this line
+
+  // Add state for real data
+  const [debateHistory, setDebateHistory] = useState<DebateHistoryItem[]>([]);
+  const [userRank, setUserRank] = useState<number>(0);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -115,7 +74,104 @@ export default function ProfilePage() {
     }
   }, [isLoading, user, navigate]);
 
-  // Show loading state if user is not authenticated
+  // Fetch debate history and rank on component mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!user) return;
+
+      try {
+        setLoadingHistory(true);
+
+        // Fetch user rank
+        try {
+          const rankData = await apiClient.get(
+            `/api/leaderboard/user/${user.id}`,
+          );
+          // Handle different possible response structures
+          const rank = rankData.rank
+          setUserRank(rank);
+        } catch (rankError) {
+          console.error("Error fetching rank:", rankError);
+          setUserRank(0); // Default rank if fetch fails
+        }
+
+        // Fetch debate history
+        const historyData = await userService.getDebateHistory();
+        setDebateHistory(historyData);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    fetchUserData();
+  }, [user]);
+
+  // Calculate stats from real data
+  const calculateStats = () => {
+    const evaluations = debateHistory.filter((d) => d.evaluation);
+    const wins = evaluations.filter(
+      (d) => d.evaluation.overall_score >= 70,
+    ).length; // Consider 70+ as win
+    const losses = evaluations.length - wins;
+    const winRate =
+      evaluations.length > 0
+        ? Math.round((wins / evaluations.length) * 100)
+        : 0;
+
+    // Calculate streaks (simplified - consecutive debates above 70)
+    let currentStreak = 0;
+    let bestStreak = 0;
+    let tempStreak = 0;
+
+    for (const debate of debateHistory.slice().reverse()) {
+      // Check from most recent
+      if (debate.evaluation && debate.evaluation.overall_score >= 70) {
+        tempStreak++;
+        bestStreak = Math.max(bestStreak, tempStreak);
+        if (debate === debateHistory[debateHistory.length - 1]) {
+          currentStreak = tempStreak;
+        }
+      } else {
+        tempStreak = 0;
+      }
+    }
+
+    return { wins, losses, winRate, currentStreak, bestStreak };
+  };
+
+  const realStats = calculateStats();
+
+  // Map backend user -> view model with real calculated stats
+  const profile = useMemo(
+    () => ({
+      id: user.id,
+      name: user.full_name || user.username,
+      email: user.email,
+      avatar: "",
+      joinedDate: user.created_at,
+      bio: user.bio || "Passionate debater using DebateAI.",
+      stats: {
+        totalDebates: user.total_debates,
+        wins: realStats.wins,
+        losses: realStats.losses,
+        winRate: realStats.winRate,
+        averageScore: Math.round(user.avg_score * 10) / 10,
+        rank: userRank,
+        streakCurrent: realStats.currentStreak,
+        streakBest: realStats.bestStreak,
+      },
+    }),
+    [user, realStats, userRank],
+  );
+
+    // Sync localProfile whenever profile changes
+  useEffect(() => {
+    setLocalProfile(profile);
+  }, [profile]);
+
+    // Show loading state if user is not authenticated
   if (isLoading || !user) {
     return (
       <div className="min-h-screen bg-background">
@@ -128,56 +184,37 @@ export default function ProfilePage() {
       </div>
     );
   }
-
-  // Map backend user -> view model
-  const profile = {
-    id: user.id,
-    name: user.full_name || user.username,           // display name
-    email: user.email,
-    avatar: "",                                      // not in backend yet
-    joinedDate: user.created_at,                     // ISO string
-    bio: "Passionate debater using DebateAI.",       // placeholder until backend supports bio
-    stats: {
-      totalDebates: user.total_debates,
-      wins: 0,                                       // not in backend
-      losses: 0,                                     // not in backend
-      winRate: 0,                                    // not in backend
-      averageScore: user.avg_score,
-      rank: 0,                                       // can later map from leaderboard API
-      streakCurrent: 0,                              // not in backend
-      streakBest: 0,                                 // not in backend
-    },
-  };
-
   // State for profile editing
   const [isEditing, setIsEditing] = useState(false);
   const [localProfile, setLocalProfile] = useState(profile);
   const [settings, setSettings] = useState(mockSettings);
 
   const handleProfileUpdate = (field: string, value: string) => {
-    setLocalProfile(prev => ({ ...prev, [field]: value }));
+    setLocalProfile((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleNotificationToggle = (key: keyof typeof settings.notifications) => {
-    setSettings(prev => ({
+  const handleNotificationToggle = (
+    key: keyof typeof settings.notifications,
+  ) => {
+    setSettings((prev) => ({
       ...prev,
-      notifications: { ...prev.notifications, [key]: !prev.notifications[key] }
+      notifications: { ...prev.notifications, [key]: !prev.notifications[key] },
     }));
   };
 
   const handleVoiceToggle = (key: keyof typeof settings.voice) => {
-    if (typeof settings.voice[key] === 'boolean') {
-      setSettings(prev => ({
+    if (typeof settings.voice[key] === "boolean") {
+      setSettings((prev) => ({
         ...prev,
-        voice: { ...prev.voice, [key]: !prev.voice[key] }
+        voice: { ...prev.voice, [key]: !prev.voice[key] },
       }));
     }
   };
 
   const handlePrivacyToggle = (key: keyof typeof settings.privacy) => {
-    setSettings(prev => ({
+    setSettings((prev) => ({
       ...prev,
-      privacy: { ...prev.privacy, [key]: !prev.privacy[key] }
+      privacy: { ...prev.privacy, [key]: !prev.privacy[key] },
     }));
   };
 
@@ -191,14 +228,13 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async () => {
     try {
-      // Map local profile fields to backend update DTO
-      const payload: { username?: string; full_name?: string } = {
-        full_name: localProfile.name, // treat display name as full_name for now
-        // username: ...               // add here if/when you expose username in UI
+      const payload: { username?: string; full_name?: string; bio?: string } = {
+        full_name: localProfile.name,
+        bio: localProfile.bio, // Add bio to payload
       };
 
       await userService.updateProfile(payload);
-      await loadUser(); // refresh global user in AuthContext from backend
+      await loadUser();
 
       setIsEditing(false);
 
@@ -221,7 +257,10 @@ export default function ProfilePage() {
 
       <main className="container mx-auto px-4 py-8 pt-24">
         {/* Back Navigation */}
-        <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
+        >
           <ArrowLeft className="h-4 w-4" />
           Back to Home
         </Link>
@@ -233,44 +272,71 @@ export default function ProfilePage() {
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                 {/* Avatar */}
                 <Avatar className="h-24 w-24 border-4 border-primary/20">
-                  <AvatarImage src={localProfile.avatar} alt={localProfile.name} />
+                  <AvatarImage
+                    src={localProfile.avatar}
+                    alt={localProfile.name}
+                  />
                   <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                    {localProfile.name.split(' ').map(n => n[0]).join('')}
+                    {localProfile.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
                   </AvatarFallback>
                 </Avatar>
 
                 {/* Profile Info */}
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">{localProfile.name}</h1>
-                    <Badge variant="secondary" className="hidden md:inline-flex">
+                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+                      {localProfile.name}
+                    </h1>
+                    <Badge
+                      variant="secondary"
+                      className="hidden md:inline-flex"
+                    >
                       <Trophy className="h-3 w-3 mr-1" />
                       Rank #{localProfile.stats.rank}
                     </Badge>
                   </div>
-                  <p className="text-muted-foreground mb-2">{localProfile.email}</p>
-                  <p className="text-sm text-foreground/80 max-w-xl">{localProfile.bio}</p>
+                  <p className="text-muted-foreground mb-2">
+                    {localProfile.email}
+                  </p>
+                  <p className="text-sm text-foreground/80 max-w-xl">
+                    {localProfile.bio}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Member since {new Date(localProfile.joinedDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    Member since{" "}
+                    {new Date(localProfile.joinedDate).toLocaleDateString(
+                      "en-US",
+                      { month: "long", year: "numeric" },
+                    )}
                   </p>
                 </div>
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full md:w-auto">
                   <div className="text-center p-3 rounded-lg bg-secondary/50">
-                    <p className="text-2xl font-bold text-primary">{localProfile.stats.totalDebates}</p>
+                    <p className="text-2xl font-bold text-primary">
+                      {localProfile.stats.totalDebates}
+                    </p>
                     <p className="text-xs text-muted-foreground">Debates</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-secondary/50">
-                    <p className="text-2xl font-bold text-accent">{localProfile.stats.winRate}%</p>
+                    <p className="text-2xl font-bold text-accent">
+                      {localProfile.stats.winRate}%
+                    </p>
                     <p className="text-xs text-muted-foreground">Win Rate</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-secondary/50">
-                    <p className="text-2xl font-bold text-foreground">{localProfile.stats.averageScore}</p>
+                    <p className="text-2xl font-bold text-foreground">
+                      {localProfile.stats.averageScore}
+                    </p>
                     <p className="text-xs text-muted-foreground">Avg Score</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-secondary/50">
-                    <p className="text-2xl font-bold text-primary">{localProfile.stats.streakCurrent}</p>
+                    <p className="text-2xl font-bold text-primary">
+                      {localProfile.stats.streakCurrent}
+                    </p>
                     <p className="text-xs text-muted-foreground">Win Streak</p>
                   </div>
                 </div>
@@ -304,46 +370,93 @@ export default function ProfilePage() {
                   <History className="h-5 w-5 text-primary" />
                   Debate History
                 </CardTitle>
-                <CardDescription>Your recent debate sessions and results</CardDescription>
+                <CardDescription>
+                  Your recent debate sessions and results
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockDebateHistory.map((debate) => (
-                    <div
-                      key={debate.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-border hover:bg-secondary/30 transition-colors gap-4"
+                {loadingHistory ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">
+                      Loading debate history...
+                    </p>
+                  </div>
+                ) : debateHistory.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      No debates completed yet.
+                    </p>
+                    <Button
+                      className="mt-4"
+                      onClick={() => navigate("/topics")}
                     >
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-foreground truncate">{debate.topic}</h4>
-                        <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(debate.date).toLocaleDateString()}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {debate.duration}
-                          </span>
-                          <Badge variant="outline">{debate.position}</Badge>
+                      Start Your First Debate
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {debateHistory.map((debate) => {
+                      const evaluation = debate.evaluation;
+                      const score = evaluation
+                        ? Math.round(evaluation.overall_score)
+                        : 0;
+                      const result = score >= 70 ? "won" : "lost"; // Simple win/loss logic
+                      const duration = debate.session?.duration_seconds || 0;
+                      const mins = Math.floor(duration / 60);
+                      const secs = duration % 60;
+                      const durationStr = `${mins}:${secs.toString().padStart(2, "0")}`;
+
+                      return (
+                        <div
+                          key={debate.session.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-border hover:bg-secondary/30 transition-colors gap-4"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-foreground truncate">
+                              {debate.session.topic}
+                            </h4>
+                            <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(
+                                  debate.session.created_at,
+                                ).toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {durationStr}
+                              </span>
+                              <Badge variant="outline">
+                                {debate.session.candidate_stance}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="text-lg font-semibold text-foreground">
+                                {score}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Score
+                              </p>
+                            </div>
+                            {getResultBadge(result)}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-lg font-semibold text-foreground">{debate.score}</p>
-                          <p className="text-xs text-muted-foreground">Score</p>
-                        </div>
-                        {getResultBadge(debate.result)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Load More Button - Ready for pagination */}
-                <div className="mt-6 text-center">
-                  <Button variant="outline" className="w-full sm:w-auto">
-                    Load More History
-                  </Button>
-                </div>
+                {debateHistory.length > 0 && (
+                  <div className="mt-6 text-center">
+                    <Button variant="outline" className="w-full sm:w-auto">
+                      Load More History
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -361,21 +474,31 @@ export default function ProfilePage() {
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Total Debates</span>
-                      <span className="font-semibold">{localProfile.stats.totalDebates}</span>
+                      <span className="text-muted-foreground">
+                        Total Debates
+                      </span>
+                      <span className="font-semibold">
+                        {localProfile.stats.totalDebates}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Wins</span>
-                      <span className="font-semibold text-accent">{localProfile.stats.wins}</span>
+                      <span className="font-semibold text-accent">
+                        {localProfile.stats.wins}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Losses</span>
-                      <span className="font-semibold text-destructive">{localProfile.stats.losses}</span>
+                      <span className="font-semibold text-destructive">
+                        {localProfile.stats.losses}
+                      </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Win Rate</span>
-                      <span className="font-bold text-primary">{localProfile.stats.winRate}%</span>
+                      <span className="font-bold text-primary">
+                        {localProfile.stats.winRate}%
+                      </span>
                     </div>
                   </div>
                 </CardContent>
@@ -391,15 +514,23 @@ export default function ProfilePage() {
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Average Score</span>
-                      <span className="font-semibold">{localProfile.stats.averageScore}</span>
+                      <span className="text-muted-foreground">
+                        Average Score
+                      </span>
+                      <span className="font-semibold">
+                        {localProfile.stats.averageScore}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Highest Score</span>
+                      <span className="text-muted-foreground">
+                        Highest Score
+                      </span>
                       <span className="font-semibold text-accent">91</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Lowest Score</span>
+                      <span className="text-muted-foreground">
+                        Lowest Score
+                      </span>
                       <span className="font-semibold">72</span>
                     </div>
                   </div>
@@ -416,17 +547,25 @@ export default function ProfilePage() {
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Current Streak</span>
-                      <span className="font-semibold">{localProfile.stats.streakCurrent} 🔥</span>
+                      <span className="text-muted-foreground">
+                        Current Streak
+                      </span>
+                      <span className="font-semibold">
+                        {localProfile.stats.streakCurrent} 🔥
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Best Streak</span>
-                      <span className="font-semibold text-accent">{localProfile.stats.streakBest}</span>
+                      <span className="font-semibold text-accent">
+                        {localProfile.stats.streakBest}
+                      </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Global Rank</span>
-                      <span className="font-bold text-primary">#{localProfile.stats.rank}</span>
+                      <span className="font-bold text-primary">
+                        #{localProfile.stats.rank}
+                      </span>
                     </div>
                   </div>
                 </CardContent>
@@ -460,7 +599,9 @@ export default function ProfilePage() {
                     <Input
                       id="name"
                       value={localProfile.name}
-                      onChange={(e) => handleProfileUpdate('name', e.target.value)}
+                      onChange={(e) =>
+                        handleProfileUpdate("name", e.target.value)
+                      }
                       disabled={!isEditing}
                     />
                   </div>
@@ -470,7 +611,9 @@ export default function ProfilePage() {
                       id="email"
                       type="email"
                       value={localProfile.email}
-                      onChange={(e) => handleProfileUpdate('email', e.target.value)}
+                      onChange={(e) =>
+                        handleProfileUpdate("email", e.target.value)
+                      }
                       disabled={!isEditing}
                     />
                   </div>
@@ -479,7 +622,9 @@ export default function ProfilePage() {
                     <Input
                       id="bio"
                       value={localProfile.bio}
-                      onChange={(e) => handleProfileUpdate('bio', e.target.value)}
+                      onChange={(e) =>
+                        handleProfileUpdate("bio", e.target.value)
+                      }
                       disabled={!isEditing}
                     />
                   </div>
@@ -503,33 +648,45 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Debate Reminders</p>
-                      <p className="text-sm text-muted-foreground">Get notified about scheduled debates</p>
+                      <p className="text-sm text-muted-foreground">
+                        Get notified about scheduled debates
+                      </p>
                     </div>
                     <Switch
                       checked={settings.notifications.debateReminders}
-                      onCheckedChange={() => handleNotificationToggle('debateReminders')}
+                      onCheckedChange={() =>
+                        handleNotificationToggle("debateReminders")
+                      }
                     />
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Weekly Reports</p>
-                      <p className="text-sm text-muted-foreground">Receive weekly performance summaries</p>
+                      <p className="text-sm text-muted-foreground">
+                        Receive weekly performance summaries
+                      </p>
                     </div>
                     <Switch
                       checked={settings.notifications.weeklyReports}
-                      onCheckedChange={() => handleNotificationToggle('weeklyReports')}
+                      onCheckedChange={() =>
+                        handleNotificationToggle("weeklyReports")
+                      }
                     />
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Leaderboard Updates</p>
-                      <p className="text-sm text-muted-foreground">Know when your rank changes</p>
+                      <p className="text-sm text-muted-foreground">
+                        Know when your rank changes
+                      </p>
                     </div>
                     <Switch
                       checked={settings.notifications.leaderboardUpdates}
-                      onCheckedChange={() => handleNotificationToggle('leaderboardUpdates')}
+                      onCheckedChange={() =>
+                        handleNotificationToggle("leaderboardUpdates")
+                      }
                     />
                   </div>
                 </CardContent>
@@ -547,29 +704,35 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Speech-to-Text</p>
-                      <p className="text-sm text-muted-foreground">Enable voice input during debates</p>
+                      <p className="text-sm text-muted-foreground">
+                        Enable voice input during debates
+                      </p>
                     </div>
                     <Switch
                       checked={settings.voice.speechToText}
-                      onCheckedChange={() => handleVoiceToggle('speechToText')}
+                      onCheckedChange={() => handleVoiceToggle("speechToText")}
                     />
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Text-to-Speech</p>
-                      <p className="text-sm text-muted-foreground">AI reads responses aloud</p>
+                      <p className="text-sm text-muted-foreground">
+                        AI reads responses aloud
+                      </p>
                     </div>
                     <Switch
                       checked={settings.voice.textToSpeech}
-                      onCheckedChange={() => handleVoiceToggle('textToSpeech')}
+                      onCheckedChange={() => handleVoiceToggle("textToSpeech")}
                     />
                   </div>
                   <Separator />
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <p className="font-medium">Voice Speed</p>
-                      <span className="text-sm text-muted-foreground">{settings.voice.voiceSpeed}x</span>
+                      <span className="text-sm text-muted-foreground">
+                        {settings.voice.voiceSpeed}x
+                      </span>
                     </div>
                     <Input
                       type="range"
@@ -577,10 +740,15 @@ export default function ProfilePage() {
                       max="2"
                       step="0.1"
                       value={settings.voice.voiceSpeed}
-                      onChange={(e) => setSettings(prev => ({
-                        ...prev,
-                        voice: { ...prev.voice, voiceSpeed: parseFloat(e.target.value) }
-                      }))}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          voice: {
+                            ...prev.voice,
+                            voiceSpeed: parseFloat(e.target.value),
+                          },
+                        }))
+                      }
                       className="w-full"
                     />
                   </div>
@@ -599,22 +767,30 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Show on Leaderboard</p>
-                      <p className="text-sm text-muted-foreground">Appear in public rankings</p>
+                      <p className="text-sm text-muted-foreground">
+                        Appear in public rankings
+                      </p>
                     </div>
                     <Switch
                       checked={settings.privacy.showOnLeaderboard}
-                      onCheckedChange={() => handlePrivacyToggle('showOnLeaderboard')}
+                      onCheckedChange={() =>
+                        handlePrivacyToggle("showOnLeaderboard")
+                      }
                     />
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Public Profile</p>
-                      <p className="text-sm text-muted-foreground">Allow others to view your profile</p>
+                      <p className="text-sm text-muted-foreground">
+                        Allow others to view your profile
+                      </p>
                     </div>
                     <Switch
                       checked={settings.privacy.publicProfile}
-                      onCheckedChange={() => handlePrivacyToggle('publicProfile')}
+                      onCheckedChange={() =>
+                        handlePrivacyToggle("publicProfile")
+                      }
                     />
                   </div>
                 </CardContent>
@@ -633,7 +809,9 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">Theme</p>
-                    <p className="text-sm text-muted-foreground">Toggle between light and dark mode</p>
+                    <p className="text-sm text-muted-foreground">
+                      Toggle between light and dark mode
+                    </p>
                   </div>
                   <ThemeToggle />
                 </div>

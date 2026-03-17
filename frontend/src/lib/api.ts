@@ -4,8 +4,7 @@ class ApiClient {
   private token: string | null;
 
   constructor() {
-    this.baseUrl =
-      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+    this.baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
     this.token = localStorage.getItem("auth_token");
   }
 
@@ -19,21 +18,20 @@ class ApiClient {
     localStorage.removeItem("auth_token");
   }
 
-  async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const headers: HeadersInit = {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     };
 
-    if (this.token) {
-      headers["Authorization"] = `Bearer ${this.token}`;
+    // Always check for fresh token from both instance and localStorage
+    const token = this.token || localStorage.getItem("auth_token");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const url = `${this.baseUrl}${endpoint}`;
-    console.log(`[API] ${options.method || 'GET'} ${url}`);
+    console.log(`[API] ${options.method || "GET"} ${url}`);
 
     try {
       const response = await fetch(url, {
@@ -43,16 +41,21 @@ class ApiClient {
 
       const contentType = response.headers.get("content-type");
       let data;
-      
+
       if (contentType && contentType.includes("application/json")) {
         data = await response.json();
       } else {
         const text = await response.text();
-        throw new Error(text || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(
+          text || `HTTP ${response.status}: ${response.statusText}`,
+        );
       }
 
       if (!response.ok) {
-        const errorMessage = data?.detail || data?.message || `HTTP ${response.status}: ${response.statusText}`;
+        const errorMessage =
+          data?.detail ||
+          data?.message ||
+          `HTTP ${response.status}: ${response.statusText}`;
         console.error(`[API Error] ${errorMessage}`);
         throw new Error(errorMessage);
       }

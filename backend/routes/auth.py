@@ -51,6 +51,7 @@ async def signup(user: UserCreate):
             "email": user.email,
             "username": user.username,
             "full_name": user.full_name,
+            "bio": user.bio,
             "hashed_password": hashed_password,
             "created_at": datetime.utcnow(),
             "total_debates": 0,
