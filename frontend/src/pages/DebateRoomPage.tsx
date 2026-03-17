@@ -19,6 +19,8 @@ interface Message {
 export default function DebateRoomPage() {
   const navigate = useNavigate()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const recognitionRef = useRef<any>(null)
+
   const location = useLocation()
   const { topicId, topic, stance, difficulty, isCustom, description, category } = location.state || {}
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -30,18 +32,67 @@ export default function DebateRoomPage() {
   const [isRecording, setIsRecording] = useState(false)
   const maxRounds = 5
 
+  //text to speech
+  const speakText = (text: string) => {
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = "en-US"
+    utterance.rate = 1
+    utterance.pitch = 1
 
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(utterance)
+  }
+
+  //speech recognition setup
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition
+
+    if (!SpeechRecognition) return
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = "en-US"
+    recognition.interimResults = false
+    recognition.continuous = false
+
+    recognition.onstart = () => setIsRecording(true)
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript
+      setInputMessage(transcript)
+    }
+
+    recognition.onend = () => setIsRecording(false)
+
+    recognitionRef.current = recognition
+  }, [])
+
+  const toggleRecording = () => {
+    if (isTyping) return
+    if (!recognitionRef.current) {
+      alert("Speech Recognition not supported in this browser")
+      return
+    }
+
+    if (isRecording) {
+      recognitionRef.current.stop()
+    } else {
+      recognitionRef.current.start()
+    }
+  }
+  //autoscroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // ✅ timer
+  //  timer
   useEffect(() => {
     const timer = setInterval(() => setTimeElapsed((p) => p + 1), 1000)
     return () => clearInterval(timer)
   }, [])
   
-  // Auto-scroll to bottom
+  // create session
   useEffect(() => {
     ;(async () => {
       try {
@@ -62,6 +113,8 @@ export default function DebateRoomPage() {
         setSessionId(session.id)
         const opening = session.messages?.[0]?.content || "Let’s begin."
         setMessages([{ id: 1, role: "ai", content: opening, timestamp: new Date() }])
+        // Speak the opening statement
+        speakText(opening)
       } catch (e) {
         // optional: navigate to login or show toast
         console.error(e)
@@ -85,19 +138,11 @@ export default function DebateRoomPage() {
     }
   }
 
-  // Simulated AI responses based on difficulty
-  const getAIResponse = (userMessage: string): string => {
-    const responses = [
-      `That's an interesting point about "${userMessage.slice(0, 50)}...". However, consider this counter-argument: The evidence suggests that while your perspective has merit, there are significant factors you may not have considered. Studies show that the opposing view has substantial backing in academic literature.`,
-      `I appreciate your argument, but let me challenge that assumption. The data indicates that the situation is more nuanced than you've presented. Furthermore, historical precedents suggest a different outcome than what you're proposing.`,
-      `While I understand your position, there are critical flaws in that reasoning. First, the premise relies on assumptions that haven't been proven. Second, similar arguments have been made before and were found to be incomplete when examined under scrutiny.`,
-      `That's a compelling point. However, I'd like to present an alternative perspective. The consequences of your proposed stance could lead to unintended outcomes that might actually contradict your original goals. Let me explain why...`,
-      `Your argument raises valid concerns, but overlooks key evidence. Recent research contradicts some of your core assumptions. Additionally, experts in this field have noted that the approach you're advocating has significant limitations.`
-    ]
-    return responses[Math.floor(Math.random() * responses.length)]
-  }
 
   const handleSendMessage = async () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+    }
     if (!inputMessage.trim() || !sessionId) return
     const content = inputMessage.trim()
 
@@ -119,6 +164,9 @@ export default function DebateRoomPage() {
     ])
     setIsTyping(false)
 
+    // 🔊 Speak AI reply
+    speakText(res.ai_message)
+
     // ✅ keep your round progress UI working
     setDebateRound((r) => Math.min(r + 1, maxRounds))
   }
@@ -126,7 +174,8 @@ export default function DebateRoomPage() {
 
 const handleEndDebate = async () => {
   if (!sessionId) return;
-  
+  //stop the speech
+  window.speechSynthesis.cancel()
   try {
     // End the debate session
     await apiClient.post(`/api/debate/session/${sessionId}/end`);
@@ -292,11 +341,15 @@ const handleEndDebate = async () => {
         <div className="container mx-auto px-4 py-4 max-w-4xl">
           <div className="flex gap-3">
             <Button
-              variant="outline"
-              size="icon"
-              className={`flex-shrink-0 ${isRecording ? 'bg-red-500/20 border-red-500 text-red-500' : 'border-border'}`}
-              onClick={() => setIsRecording(!isRecording)}
-            >
+            variant="outline"
+            size="icon"
+            className={`flex-shrink-0 ${
+              isRecording 
+                ? 'bg-red-500/20 border-red-500 text-red-500' 
+                : 'border-border'
+            }`}
+            onClick={toggleRecording}
+          >
               {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </Button>
             <Textarea
