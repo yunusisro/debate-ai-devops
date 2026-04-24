@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -7,24 +7,41 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Trophy, Medal, Award, Crown } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { apiClient } from "@/lib/api"
 
-// Mock leaderboard data
-const leaderboardData = [
-  { rank: 1, name: "Alex Chen", wins: 89, debates: 102, points: 2840 },
-  { rank: 2, name: "Sarah Kim", wins: 76, debates: 95, points: 2650 },
-  { rank: 3, name: "Marcus Johnson", wins: 71, debates: 88, points: 2480 },
-  { rank: 4, name: "Emma Wilson", wins: 68, debates: 85, points: 2320 },
-  { rank: 5, name: "David Rodriguez", wins: 65, debates: 82, points: 2180 },
-  { rank: 6, name: "Lily Zhang", wins: 62, debates: 79, points: 2050 },
-  { rank: 7, name: "James Miller", wins: 58, debates: 76, points: 1920 },
-  { rank: 8, name: "Maya Patel", wins: 55, debates: 73, points: 1800 },
-  { rank: 9, name: "Noah Brown", wins: 52, debates: 70, points: 1680 },
-  { rank: 10, name: "Zoe Davis", wins: 49, debates: 67, points: 1560 }
-]
+interface LeaderboardUser {
+  rank: number
+  username: string
+  total_debates: number
+  wins: number
+  points: number
+  average_score: number
+  highest_score: number
+}
 
 export default function LeaderboardPage() {
   const navigate = useNavigate()
   const [timeFrame, setTimeFrame] = useState("all-time")
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      setLoading(true)
+      try {
+        const data = await apiClient.get<LeaderboardUser[]>("/api/leaderboard")
+        setLeaderboardData(data)
+      } catch (error) {
+        console.error("Error fetching leaderboard:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchLeaderboard()
+  }, [])
+
+  const topThree = useMemo(() => leaderboardData.slice(0, 3), [leaderboardData])
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -38,6 +55,9 @@ export default function LeaderboardPage() {
         return <Award className="h-5 w-5 text-muted-foreground" />
     }
   }
+
+  const formatNumber = (value: number | undefined) =>
+    Number(value ?? 0).toLocaleString()
 
   const getRankBadge = (rank: number) => {
     if (rank <= 3) {
@@ -99,29 +119,36 @@ export default function LeaderboardPage() {
               <CardTitle className="text-center text-2xl">Top Performers</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {leaderboardData.slice(0, 3).map((user, index) => (
-                  <div key={user.rank} className={`text-center space-y-4 ${index === 0 ? 'md:order-2' : index === 1 ? 'md:order-1' : 'md:order-3'}`}>
-                    <div className="relative">
-                      <div className={`w-20 h-20 mx-auto rounded-full bg-gradient-to-br flex items-center justify-center ${
-                        user.rank === 1 
-                          ? 'from-yellow-400 to-yellow-600 dark:from-yellow-300 dark:to-yellow-500' 
-                          : user.rank === 2 
-                          ? 'from-gray-300 to-gray-500 dark:from-gray-400 dark:to-gray-600'
-                          : 'from-amber-500 to-amber-700 dark:from-amber-400 dark:to-amber-600'
-                      }`}>
-                        {getRankIcon(user.rank)}
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading leaderboard...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {topThree.map((user, index) => (
+                    <div key={user.rank} className={`text-center space-y-4 ${index === 0 ? 'md:order-2' : index === 1 ? 'md:order-1' : 'md:order-3'}`}>
+                      <div className="relative">
+                        <div className={`w-20 h-20 mx-auto rounded-full bg-gradient-to-br flex items-center justify-center ${
+                          user.rank === 1 
+                            ? 'from-yellow-400 to-yellow-600 dark:from-yellow-300 dark:to-yellow-500' 
+                            : user.rank === 2 
+                            ? 'from-gray-300 to-gray-500 dark:from-gray-400 dark:to-gray-600'
+                            : 'from-amber-500 to-amber-700 dark:from-amber-400 dark:to-amber-600'
+                        }`}>
+                          {getRankIcon(user.rank)}
+                        </div>
+                        <Badge className="absolute -top-2 -right-2">#{user.rank}</Badge>
                       </div>
-                      <Badge className="absolute -top-2 -right-2">#{user.rank}</Badge>
+                      <div>
+                        <h3 className="font-bold text-lg">{user.username}</h3>
+                        <p className="text-sm text-muted-foreground">{formatNumber(user.points)} points</p>
+                        <p className="text-sm text-muted-foreground">{formatNumber(user.wins)}/{formatNumber(user.total_debates)} wins</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-lg">{user.name}</h3>
-                      <p className="text-sm text-muted-foreground">{user.points} points</p>
-                      <p className="text-sm text-muted-foreground">{user.wins}/{user.debates} wins</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -164,13 +191,13 @@ export default function LeaderboardPage() {
                           <TableCell className="font-medium">
                             {getRankBadge(user.rank)}
                           </TableCell>
-                          <TableCell className="font-medium">{user.name}</TableCell>
+                          <TableCell className="font-medium">{user.username}</TableCell>
                           <TableCell className="text-center font-medium text-accent">
-                            {user.wins}
+                            {formatNumber(user.wins)}
                           </TableCell>
-                          <TableCell className="text-center">{user.debates}</TableCell>
+                          <TableCell className="text-center">{formatNumber(user.total_debates)}</TableCell>
                           <TableCell className="text-center font-bold text-primary">
-                            {user.points.toLocaleString()}
+                            {formatNumber(user.points)}
                           </TableCell>
                         </TableRow>
                       ))}

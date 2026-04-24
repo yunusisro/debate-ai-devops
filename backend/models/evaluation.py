@@ -45,4 +45,6 @@ class LeaderboardEntry(BaseModel):
     total_debates: int
     average_score: float
     highest_score: float
+    wins: int = 0
+    points: int = 0
     rank: int

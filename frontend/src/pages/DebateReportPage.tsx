@@ -202,9 +202,16 @@ export default function DebateReportPage() {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-400";
-    if (score >= 60) return "text-yellow-400";
+    if (score >= 8) return "text-green-400";
+    if (score >= 5) return "text-yellow-400";
     return "text-red-400";
+  };
+
+  const getScoreResultLabel = (score: number) => {
+    if (score === 10) return "Winner";
+    if (score >= 8) return "Almost a winner";
+    if (score >= 5) return "Close match";
+    return "Lost";
   };
 
   const getDifficultyColor = (diff: string) => {
@@ -321,6 +328,9 @@ export default function DebateReportPage() {
                 className={`text-3xl font-bold ${getScoreColor(overallScore)}`}
               >
                 {overallScore}
+              </div>
+              <div className={`text-sm font-medium ${getScoreColor(overallScore)}`}>
+                {getScoreResultLabel(overallScore)}
               </div>
               <div className="text-sm text-muted-foreground">Overall Score</div>
             </CardContent>

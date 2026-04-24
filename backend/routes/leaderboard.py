@@ -17,29 +17,53 @@ async def get_leaderboard(
 
     users_cursor = users_collection.find({
         "total_debates": {"$gt": 0}
-    }).sort("avg_score", -1).limit(limit)
+    })
 
-    users = await users_cursor.to_list(length=limit)
+    users = await users_cursor.to_list(length=1000)
 
-    leaderboard = []
-    for idx, user in enumerate(users, start=1):
+    leaderboard_entries = []
+    for user in users:
         evaluations_cursor = evaluations_collection.find({
             "user_id": user["_id"]
-        }).sort("overall_score", -1).limit(1)
+        })
+        evaluations = await evaluations_cursor.to_list(length=1000)
 
-        top_evaluation = await evaluations_cursor.to_list(length=1)
-        highest_score = top_evaluation[0]["overall_score"] if top_evaluation else 0.0
+        total_debates = len(evaluations)
+        wins = sum(1 for ev in evaluations if float(ev.get("overall_score", 0.0)) == 10.0)
+        total_score = sum(float(ev.get("overall_score", 0.0)) for ev in evaluations)
+        highest_score = max((float(ev.get("overall_score", 0.0)) for ev in evaluations), default=0.0)
 
-        leaderboard.append(
-            LeaderboardEntry(
-                user_id=str(user["_id"]),
-                username=user["username"],
-                total_debates=user.get("total_debates", 0),
-                average_score=round(user.get("avg_score", 0.0), 2),
-                highest_score=round(highest_score, 2),
-                rank=idx
-            )
+        leaderboard_entries.append({
+            "user_id": str(user["_id"]),
+            "username": user.get("full_name") or user.get("username"),
+            "total_debates": total_debates,
+            "average_score": round(user.get("avg_score", 0.0), 2),
+            "highest_score": round(highest_score, 2),
+            "wins": wins,
+            "points": int(round(total_score * 10)),
+        })
+
+    leaderboard_entries.sort(
+        key=lambda entry: (
+            -entry["wins"],
+            -entry["average_score"],
+            -entry["highest_score"],
         )
+    )
+
+    leaderboard = [
+        LeaderboardEntry(
+            user_id=entry["user_id"],
+            username=entry["username"],
+            total_debates=entry["total_debates"],
+            average_score=entry["average_score"],
+            highest_score=entry["highest_score"],
+            wins=entry["wins"],
+            points=entry["points"],
+            rank=index + 1,
+        )
+        for index, entry in enumerate(leaderboard_entries[:limit])
+    ]
 
     return leaderboard
 
@@ -62,25 +86,63 @@ async def get_user_rank(
             detail="User not found"
         )
 
-    users_above = await users_collection.count_documents({
-        "avg_score": {"$gt": target_user.get("avg_score", 0.0)},
+    users_cursor = users_collection.find({
         "total_debates": {"$gt": 0}
     })
 
-    rank = users_above + 1
+    all_users = await users_cursor.to_list(length=1000)
+    leaderboard_entries = []
 
-    evaluations_cursor = evaluations_collection.find({
-        "user_id": ObjectId(user_id)
-    }).sort("overall_score", -1).limit(1)
+    for user in all_users:
+        evaluations_cursor = evaluations_collection.find({
+            "user_id": user["_id"]
+        })
+        evaluations = await evaluations_cursor.to_list(length=1000)
 
-    top_evaluation = await evaluations_cursor.to_list(length=1)
-    highest_score = top_evaluation[0]["overall_score"] if top_evaluation else 0.0
+        total_debates = len(evaluations)
+        wins = sum(1 for ev in evaluations if float(ev.get("overall_score", 0.0)) == 10.0)
+        total_score = sum(float(ev.get("overall_score", 0.0)) for ev in evaluations)
+        highest_score = max((float(ev.get("overall_score", 0.0)) for ev in evaluations), default=0.0)
+
+        leaderboard_entries.append({
+            "user_id": str(user["_id"]),
+            "username": user.get("full_name") or user.get("username"),
+            "total_debates": total_debates,
+            "average_score": round(user.get("avg_score", 0.0), 2),
+            "highest_score": round(highest_score, 2),
+            "wins": wins,
+            "points": int(round(total_score * 10)),
+        })
+
+    leaderboard_entries.sort(
+        key=lambda entry: (
+            -entry["wins"],
+            -entry["average_score"],
+            -entry["highest_score"],
+        )
+    )
+
+    target_entry = next(
+        (entry for entry in leaderboard_entries if entry["user_id"] == str(target_user["_id"])),
+        None,
+    )
+
+    if not target_entry:
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User leaderboard entry not found"
+        )
+
+    rank = leaderboard_entries.index(target_entry) + 1
 
     return LeaderboardEntry(
-        user_id=str(target_user["_id"]),
-        username=target_user["username"],
-        total_debates=target_user.get("total_debates", 0),
-        average_score=round(target_user.get("avg_score", 0.0), 2),
-        highest_score=round(highest_score, 2),
+        user_id=target_entry["user_id"],
+        username=target_entry["username"],
+        total_debates=target_entry["total_debates"],
+        average_score=target_entry["average_score"],
+        highest_score=target_entry["highest_score"],
+        wins=target_entry["wins"],
+        points=target_entry["points"],
         rank=rank
     )

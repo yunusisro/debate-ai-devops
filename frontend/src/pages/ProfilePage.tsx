@@ -67,6 +67,28 @@ export default function ProfilePage() {
   const [userRank, setUserRank] = useState<number>(0);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // State for profile editing
+  const [isEditing, setIsEditing] = useState(false);
+  const [localProfile, setLocalProfile] = useState({
+    id: "",
+    name: "",
+    email: "",
+    avatar: "",
+    joinedDate: "",
+    bio: "",
+    stats: {
+      totalDebates: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+      averageScore: 0,
+      rank: 0,
+      streakCurrent: 0,
+      streakBest: 0,
+    },
+  });
+  const [settings, setSettings] = useState(mockSettings);
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isLoading && !user) {
@@ -112,22 +134,22 @@ export default function ProfilePage() {
   const calculateStats = () => {
     const evaluations = debateHistory.filter((d) => d.evaluation);
     const wins = evaluations.filter(
-      (d) => d.evaluation.overall_score >= 70,
-    ).length; // Consider 70+ as win
+      (d) => d.evaluation.overall_score === 10,
+    ).length; // Consider 10 as win
     const losses = evaluations.length - wins;
     const winRate =
       evaluations.length > 0
         ? Math.round((wins / evaluations.length) * 100)
         : 0;
 
-    // Calculate streaks (simplified - consecutive debates above 70)
+    // Calculate streaks (simplified - consecutive perfect debates)
     let currentStreak = 0;
     let bestStreak = 0;
     let tempStreak = 0;
 
     for (const debate of debateHistory.slice().reverse()) {
       // Check from most recent
-      if (debate.evaluation && debate.evaluation.overall_score >= 70) {
+      if (debate.evaluation && debate.evaluation.overall_score === 10) {
         tempStreak++;
         bestStreak = Math.max(bestStreak, tempStreak);
         if (debate === debateHistory[debateHistory.length - 1]) {
@@ -145,34 +167,40 @@ export default function ProfilePage() {
 
   // Map backend user -> view model with real calculated stats
   const profile = useMemo(
-    () => ({
-      id: user.id,
-      name: user.full_name || user.username,
-      email: user.email,
-      avatar: "",
-      joinedDate: user.created_at,
-      bio: user.bio || "Passionate debater using DebateAI.",
-      stats: {
-        totalDebates: user.total_debates,
-        wins: realStats.wins,
-        losses: realStats.losses,
-        winRate: realStats.winRate,
-        averageScore: Math.round(user.avg_score * 10) / 10,
-        rank: userRank,
-        streakCurrent: realStats.currentStreak,
-        streakBest: realStats.bestStreak,
-      },
-    }),
+    () => {
+      if (!user) return null;
+
+      return {
+        id: user.id,
+        name: user.full_name || user.username,
+        email: user.email,
+        avatar: "",
+        joinedDate: user.created_at,
+        bio: user.bio || "Passionate debater using DebateAI.",
+        stats: {
+          totalDebates: user.total_debates,
+          wins: realStats.wins,
+          losses: realStats.losses,
+          winRate: realStats.winRate,
+          averageScore: Math.round(user.avg_score * 10) / 10,
+          rank: userRank,
+          streakCurrent: realStats.currentStreak,
+          streakBest: realStats.bestStreak,
+        },
+      };
+    },
     [user, realStats, userRank],
   );
 
     // Sync localProfile whenever profile changes
   useEffect(() => {
-    setLocalProfile(profile);
+    if (profile) {
+      setLocalProfile(profile);
+    }
   }, [profile]);
 
-    // Show loading state if user is not authenticated
-  if (isLoading || !user) {
+    // Show loading state if user is not authenticated or profile not loaded
+  if (isLoading || !user || !profile) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -184,10 +212,6 @@ export default function ProfilePage() {
       </div>
     );
   }
-  // State for profile editing
-  const [isEditing, setIsEditing] = useState(false);
-  const [localProfile, setLocalProfile] = useState(profile);
-  const [settings, setSettings] = useState(mockSettings);
 
   const handleProfileUpdate = (field: string, value: string) => {
     setLocalProfile((prev) => ({ ...prev, [field]: value }));
@@ -219,11 +243,19 @@ export default function ProfilePage() {
   };
 
   const getResultBadge = (result: string) => {
-    return result === "won" ? (
-      <Badge className="bg-accent text-accent-foreground">Won</Badge>
-    ) : (
-      <Badge variant="destructive">Lost</Badge>
-    );
+    if (result === "won") {
+      return <Badge className="bg-emerald-500 text-emerald-100">Winner</Badge>;
+    }
+
+    if (result === "almost") {
+      return <Badge className="bg-emerald-500/20 text-emerald-500 border border-emerald-200">Almost Won</Badge>;
+    }
+
+    if (result === "close") {
+      return <Badge className="bg-yellow-500/20 text-yellow-500 border border-yellow-200">Close Match</Badge>;
+    }
+
+    return <Badge className="bg-red-500 text-red-100">Lost</Badge>;
   };
 
   const handleSaveProfile = async () => {
@@ -401,7 +433,14 @@ export default function ProfilePage() {
                       const score = evaluation
                         ? Math.round(evaluation.overall_score)
                         : 0;
-                      const result = score >= 70 ? "won" : "lost"; // Simple win/loss logic
+                      const result =
+                        score === 10
+                          ? "won"
+                          : score >= 8
+                          ? "almost"
+                          : score >= 5
+                          ? "close"
+                          : "lost";
                       const duration = debate.session?.duration_seconds || 0;
                       const mins = Math.floor(duration / 60);
                       const secs = duration % 60;
