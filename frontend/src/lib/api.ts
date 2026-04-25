@@ -30,7 +30,8 @@ class ApiClient {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const url = `${this.baseUrl}${endpoint}`;
+    
+    const url = `${this.baseUrl.replace(/\/$/, "")}${endpoint}`;
     console.log(`[API] ${options.method || "GET"} ${url}`);
 
     try {
