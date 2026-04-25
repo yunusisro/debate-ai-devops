@@ -70,6 +70,6 @@ export const userService = {
   },
 
   async getDebateHistory(limit: number = 20, skip: number = 0): Promise<DebateHistoryItem[]> {
-    return apiClient.get<DebateHistoryItem[]>(`/user/debate-history?limit=${limit}&skip=${skip}`);
+    return apiClient.get<DebateHistoryItem[]>(`/api/user/debate-history?limit=${limit}&skip=${skip}`);
   },
 };

@@ -58,7 +58,6 @@ async def lifespan(app: FastAPI):
     await close_mongo_connection()
     logger.info("=" * 60)
 
-
 app = FastAPI(
     title="Debate Assistant AI API",
     description="Backend API for AI-powered debate assistant",
@@ -66,20 +65,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://3.108.209.181:3000",
-        "http://localhost:3000"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(user.router, prefix="/api/user", tags=["User"])

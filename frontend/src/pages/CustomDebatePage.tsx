@@ -49,7 +49,7 @@ export default function CustomDebatePage() {
         participants: 0,
       })
 
-      navigate("/api/debate", {
+      navigate("/debate", {
         state: {
           topicId: created.id,
           topic: topic.trim(),
