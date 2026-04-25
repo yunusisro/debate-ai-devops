@@ -63,7 +63,6 @@ app = FastAPI(
     title="Debate Assistant AI API",
     description="Backend API for AI-powered debate assistant",
     version="1.0.0",
-    root_path="/api",
     lifespan=lifespan
 )
 
