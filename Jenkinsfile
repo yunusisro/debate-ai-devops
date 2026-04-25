@@ -3,12 +3,6 @@ pipeline {
 
     stages {
 
-        stage('Clone Repository') {
-            steps {
-                git 'https://github.com/yunusisro/debate-ai-devops.git'
-            }
-        }
-
         stage('Build Docker Containers') {
             steps {
                 bat 'docker-compose build'
