@@ -41,7 +41,7 @@ export default function CustomDebatePage() {
   const handleStartDebate = async () => {
     if (topic.trim()) {
       // Saving to the database 
-      const created = await apiClient.post<{ id: string }>("/api/topics", {
+      const created = await apiClient.post<{ id: string }>("/topics", {
         title: topic.trim(),
         description: description.trim(),
         category,

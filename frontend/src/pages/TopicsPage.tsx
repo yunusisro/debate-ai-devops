@@ -32,7 +32,7 @@ export default function TopicsPage() {
   useEffect(() => {
     ;(async () => {
       try {
-        const res = await apiClient.get<{ topics: Topic[]; total: number }>("/api/topics")
+        const res = await apiClient.get<{ topics: Topic[]; total: number }>("/topics")
         setTopics(res.topics || [])
       } catch (e: any) {
         toast({
