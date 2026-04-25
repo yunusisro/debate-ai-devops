@@ -58,7 +58,7 @@ export interface DebateHistoryItem {
 
 export const userService = {
   async getProfile(): Promise<User> {
-    return apiClient.get<User>("/user/profile");
+    return apiClient.get<User>("/api/user/profile");
   },
 
   async updateProfile(data: { 
@@ -66,7 +66,7 @@ export const userService = {
     full_name?: string;
     bio?: string;  // Add bio field
   }): Promise<User> {
-    return apiClient.put<User>("/user/profile", data);
+    return apiClient.put<User>("/api/user/profile", data);
   },
 
   async getDebateHistory(limit: number = 20, skip: number = 0): Promise<DebateHistoryItem[]> {

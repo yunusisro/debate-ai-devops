@@ -421,7 +421,7 @@ export default function ProfilePage() {
                     </p>
                     <Button
                       className="mt-4"
-                      onClick={() => navigate("/topics")}
+                      onClick={() => navigate("/api/topics")}
                     >
                       Start Your First Debate
                     </Button>

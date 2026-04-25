@@ -41,7 +41,7 @@ export default function CustomDebatePage() {
   const handleStartDebate = async () => {
     if (topic.trim()) {
       // Saving to the database 
-      const created = await apiClient.post<{ id: string }>("/topics", {
+      const created = await apiClient.post<{ id: string }>("/api/topics", {
         title: topic.trim(),
         description: description.trim(),
         category,
@@ -49,7 +49,7 @@ export default function CustomDebatePage() {
         participants: 0,
       })
 
-      navigate("/debate", {
+      navigate("/api/debate", {
         state: {
           topicId: created.id,
           topic: topic.trim(),

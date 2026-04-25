@@ -29,7 +29,7 @@ export default function LeaderboardPage() {
     const fetchLeaderboard = async () => {
       setLoading(true)
       try {
-        const data = await apiClient.get<LeaderboardUser[]>("/leaderboard")
+        const data = await apiClient.get<LeaderboardUser[]>("/api/leaderboard")
         setLeaderboardData(data)
       } catch (error) {
         console.error("Error fetching leaderboard:", error)

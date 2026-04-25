@@ -99,7 +99,7 @@ export default function DebateRoomPage() {
         const candidate_stance = stance === "neutral" ? "for" : stance
         const ai_stance = candidate_stance === "for" ? "against" : "for"
 
-        const session = await apiClient.post<any>("/debate/session", {
+        const session = await apiClient.post<any>("/api/debate/session", {
           topic,
           topic_id: topicId,
           custom_topic: !!isCustom,
@@ -153,7 +153,7 @@ export default function DebateRoomPage() {
     setInputMessage("")
     setIsTyping(true)
 
-    const res = await apiClient.post<{ ai_message: string }>("/debate/respond", {
+    const res = await apiClient.post<{ ai_message: string }>("/api/debate/respond", {
       session_id: sessionId,
       content,
     })
@@ -181,7 +181,7 @@ const handleEndDebate = async () => {
     await apiClient.post(`/api/debate/session/${sessionId}/end`);
     
     // Create evaluation
-    await apiClient.post("/evaluation", {
+    await apiClient.post("/api/evaluation", {
       session_id: sessionId,
     });
     

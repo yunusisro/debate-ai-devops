@@ -144,7 +144,7 @@ export default function DebateReportPage() {
           <p className="text-red-400 mb-4">
             {error || "Report data not available"}
           </p>
-          <Button onClick={() => navigate("/topics")}>Back to Topics</Button>
+          <Button onClick={() => navigate("/api/topics")}>Back to Topics</Button>
         </div>
       </div>
     );
@@ -256,7 +256,7 @@ export default function DebateReportPage() {
           <Button
             variant="ghost"
             className="mb-6 text-muted-foreground hover:text-foreground"
-            onClick={() => navigate("/topics")}
+            onClick={() => navigate("/api/topics")}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Topics
@@ -271,7 +271,7 @@ export default function DebateReportPage() {
               {error ||
                 "Your debate evaluation is being processed. Please check back in a few moments."}
             </p>
-            <Button onClick={() => navigate("/topics")}>Browse Topics</Button>
+            <Button onClick={() => navigate("/api/topics")}>Browse Topics</Button>
           </div>
         </div>
       </div>
@@ -288,7 +288,7 @@ export default function DebateReportPage() {
         <Button
           variant="ghost"
           className="mb-6 text-muted-foreground hover:text-foreground"
-          onClick={() => navigate("/topics")}
+          onClick={() => navigate("/api/topics")}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Topics
@@ -568,7 +568,7 @@ export default function DebateReportPage() {
           <Button
             variant="outline"
             className="border-border text-foreground hover:bg-muted"
-            onClick={() => navigate("/topics")}
+            onClick={() => navigate("/api/topics")}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Browse Topics
