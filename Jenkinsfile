@@ -1,16 +1,12 @@
 pipeline {
     agent any
 
-    tools {
-        sonarRunner 'SonarScanner'
-    }
-
     stages {
 
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    bat 'sonar-scanner'
+                    bat '"C:\\Program Files\\sonar-scanner\\bin\\sonar-scanner.bat"'
                 }
             }
         }
